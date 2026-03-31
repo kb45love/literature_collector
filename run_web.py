@@ -1,5 +1,6 @@
 """
-文献采集主程序
+网络文献采集与处理程序
+仅从网络下载文献，无本地扫描功能
 """
 
 import yaml
@@ -9,14 +10,11 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict
 import sys
-import os
-import shutil
 
 # 导入各模块
 from modules import (
     Deduplicator, 
-    LiteratureDownloader, 
-    LocalPDFReader,
+    LiteratureDownloader,
     PDFProcessor, 
     FigureExtractor, 
     MetadataManager
@@ -31,7 +29,7 @@ def setup_logging(config: Dict):
     log_dir = Path(config['output']['base_dir']) / config['output']['structure']['logs_dir']
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    log_file = log_dir / "collector.log"
+    log_file = log_dir / "web_collector.log"
     
     logging.basicConfig(
         level=getattr(logging, config['logging']['level']),
@@ -44,7 +42,7 @@ def setup_logging(config: Dict):
     
     logger = logging.getLogger(__name__)
     logger.info("=" * 60)
-    logger.info("文献采集系统启动")
+    logger.info("网络文献采集与处理系统启动")
     logger.info("=" * 60)
     
     return logger
@@ -54,7 +52,7 @@ def setup_logging(config: Dict):
 # 核心采集逻辑
 # ========================
 
-def load_config(config_file: str = "config.yaml") -> Dict:
+def load_config(config_file: str = "config_web.yaml") -> Dict:
     """加载配置文件"""
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
@@ -127,40 +125,6 @@ def collect_from_web(
     return []
 
 
-def collect_from_local(
-    local_reader: LocalPDFReader,
-    config: Dict,
-    deduplicator: Deduplicator,
-    logger
-) -> List[Dict]:
-    """从本地扫描文献"""
-    logger.info("=" * 60)
-    logger.info("开始本地扫描...")
-    logger.info("=" * 60)
-    
-    max_count = config['collection']['max_from_local']
-    
-    pdf_files = local_reader.scan_directory()
-    
-    # 限制数量
-    if max_count > 0:
-        pdf_files = pdf_files[:max_count]
-        logger.info(f"已应用数量限制，仅处理前 {max_count} 个文件")
-    
-    # 去重
-    unique_files = []
-    for pdf in pdf_files:
-        is_dup, dup_id = deduplicator.is_duplicate_by_md5(pdf['path'])
-        if not is_dup:
-            unique_files.append(pdf)
-        else:
-            logger.info(f"跳过重复文件（MD5）：{pdf['filename']}")
-    
-    logger.info(f"本地扫描完成：找到 {len(pdf_files)} 个 PDF，去重后 {len(unique_files)} 个")
-    
-    return unique_files
-
-
 def process_pdfs(
     pdf_list: List[Dict],
     config: Dict,
@@ -176,19 +140,14 @@ def process_pdfs(
     figures_dir = Path(config['output']['base_dir']) / config['output']['structure']['figures_dir']
     figures_dir.mkdir(parents=True, exist_ok=True)
     
-    downloaded_pdfs_dir = Path(config['output']['base_dir']) / 'downloaded_PDFs'
-    downloaded_pdfs_dir.mkdir(parents=True, exist_ok=True)
-    
     success_count = 0
     failed_count = 0
     total_figures = 0
     errors = []
-    local_pdfs_to_move = []  # 记录需要移动的本地 PDF
     
     for idx, pdf_info in enumerate(pdf_list, start=1):
         pdf_path = pdf_info.get('local_path') or pdf_info.get('path')
-        paper_id = pdf_info.get('paper_id', f"paper_{idx:04d}")
-        is_local = paper_id.startswith('local_')  # 根据paper_id前缀判断是否为本地PDF
+        paper_id = pdf_info.get('paper_id', f"web_{idx:04d}")
         
         logger.info(f"[{idx}/{len(pdf_list)}] 处理：{Path(pdf_path).name}")
         
@@ -207,7 +166,7 @@ def process_pdfs(
             # 获取 PDF 文件名（不含扩展名）用作图片前缀
             pdf_filename_no_ext = Path(pdf_path).stem
             
-            # 提取图片 - 添加 filename_prefix 参数
+            # 提取图片
             figures = processor.extract_images(
                 output_dir=str(figures_dir),
                 min_size=(
@@ -262,13 +221,6 @@ def process_pdfs(
                 }
             )
             
-            # 记录本地 PDF 需要移动
-            if is_local:
-                local_pdfs_to_move.append({
-                    'source': pdf_path,
-                    'dest': downloaded_pdfs_dir / Path(pdf_path).name
-                })
-            
             success_count += 1
             logger.info(f"✓ {paper_id} 处理成功，提取图版 {len(figures)} 张")
         
@@ -282,22 +234,6 @@ def process_pdfs(
                 'timestamp': datetime.now().isoformat()
             })
     
-    # 移动本地 PDF 到 downloaded_PDFs 文件夹
-    logger.info("=" * 60)
-    logger.info(f"开始移动本地 PDF 到 downloaded_PDFs 文件夹...")
-    moved_count = 0
-    for pdf_move in local_pdfs_to_move:
-        try:
-            source = Path(pdf_move['source'])
-            dest = Path(pdf_move['dest'])
-            if source.exists():
-                shutil.move(str(source), str(dest))
-                logger.info(f"✓ 已移动：{source.name} → downloaded_PDFs/")
-                moved_count += 1
-        except Exception as e:
-            logger.warning(f"✗ 移动失败 {pdf_move['source']}：{e}")
-    
-    logger.info(f"PDF 移动完成：已移动 {moved_count} 个文件")
     logger.info("=" * 60)
     logger.info(f"PDF 处理完成：成功 {success_count}，失败 {failed_count}，提取图版 {total_figures} 张")
     logger.info("=" * 60)
@@ -306,11 +242,9 @@ def process_pdfs(
 
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description='植物考古学文献采集系统')
-    parser.add_argument('--config', default='config.yaml', help='配置文件路径')
-    parser.add_argument('--web-only', action='store_true', help='仅从网络采集')
-    parser.add_argument('--local-only', action='store_true', help='仅从本地扫描')
+    """主函数 - 网络模式"""
+    parser = argparse.ArgumentParser(description='网络文献采集与处理系统')
+    parser.add_argument('--config', default='config_web.yaml', help='配置文件路径')
     
     args = parser.parse_args()
     
@@ -328,85 +262,56 @@ def main():
             delay=config['sources']['web']['engines']['google_scholar']['delay'],
             proxy=config['proxy'] if config['proxy']['enabled'] else None
         )
-        local_reader = LocalPDFReader(
-            root_dir=config['sources']['local']['root_dir'],
-            recursive=config['sources']['local']['recursive']
-        )
         metadata_manager = MetadataManager(output_dir=config['output']['base_dir'])
         
-        # 采集统计
-        stats = {
-            'from_web': 0,
-            'from_local': 0,
-            'total_unique': 0,
-            'success': 0,
-            'failed': 0,
-            'total_figures': 0
-        }
-        
-        all_pdfs = []
-        
         # 网络采集
-        if not args.local_only and config['sources']['web']['enabled']:
-            web_papers = collect_from_web(downloader, config, deduplicator, logger)
-            all_pdfs.extend(web_papers)
-            stats['from_web'] = len(web_papers)
+        web_papers = collect_from_web(downloader, config, deduplicator, logger)
         
-        # 本地扫描
-        if not args.web_only and config['sources']['local']['enabled']:
-            local_papers = collect_from_local(local_reader, config, deduplicator, logger)
-            all_pdfs.extend(local_papers)
-            stats['from_local'] = len(local_papers)
-        
-        stats['total_unique'] = len(all_pdfs)
-        
-        if not all_pdfs:
+        if not web_papers:
             logger.warning("没有采集到任何文献")
+            print("⚠️  没有采集到任何文献")
             return
         
         # 处理 PDF
         success, failed, figures, errors = process_pdfs(
-            all_pdfs, config, deduplicator, metadata_manager, logger
+            web_papers, config, deduplicator, metadata_manager, logger
         )
         
-        stats['success'] = success
-        stats['failed'] = failed
-        stats['total_figures'] = figures
-        
         # 保存输出
-        output_dir = config['output']['base_dir']
         metadata_manager.save_to_excel(filename=config['output']['structure']['metadata_file'])
         metadata_manager.save_to_csv(filename="metadata.csv")
         if errors:
             metadata_manager.save_error_log(errors)
+        
+        stats = {
+            'from_web': len(web_papers),
+            'from_local': 0,
+            'total_unique': len(web_papers),
+            'success': success,
+            'failed': failed,
+            'total_figures': figures
+        }
         metadata_manager.save_processing_report(stats)
         
         # 最终报告
         logger.info("=" * 60)
-        logger.info("采集系统已完成")
-        logger.info(f"  ✓ 从网络采集：{stats['from_web']} 篇")
-        logger.info(f"  ✓ 从本地扫描：{stats['from_local']} 篇")
-        logger.info(f"  ✓ 去重后总计：{stats['total_unique']} 篇")
+        logger.info("网络采集系统已完成")
+        logger.info(f"  ✓ 网络采集：{stats['from_web']} 篇")
         logger.info(f"  ✓ 处理成功：{stats['success']} 篇")
         logger.info(f"  ✓ 处理失败：{stats['failed']} 篇")
         logger.info(f"  ✓ 提取图版：{stats['total_figures']} 张")
-        logger.info(f"  ✓ 输出目录：{output_dir}")
         logger.info("=" * 60)
         
-        print("\n✅ 采集完成！")
+        print("\n✅ 网络采集完成！")
         print(f"📊 统计信息：")
         print(f"   网络采集：{stats['from_web']} 篇")
-        print(f"   本地扫描：{stats['from_local']} 篇")
         print(f"   处理成功：{stats['success']} 篇")
+        print(f"   处理失败：{stats['failed']} 篇")
         print(f"   提取图版：{stats['total_figures']} 张")
-        print(f"📁 输出目录：{output_dir}")
-    
-    except KeyboardInterrupt:
-        logger.warning("用户中断操作")
-        print("\n⚠️  操作已中断")
+        
     except Exception as e:
-        logger.error(f"系统错误：{e}", exc_info=True)
-        print(f"\n❌ 系统错误：{e}")
+        logger.error(f"系统出错：{e}", exc_info=True)
+        print(f"\n❌ 错误：{e}")
         sys.exit(1)
 
 

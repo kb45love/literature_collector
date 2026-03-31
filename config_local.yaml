@@ -1,0 +1,96 @@
+# ========================
+# 本地PDF扫描配置
+# ========================
+# 此配置文件仅用于 run_local.py
+# 处理本地已有的 PDF 文件，不涉及网络功能
+
+# 本地扫描配置
+sources:
+  local:
+    enabled: true
+    root_dir: "./data/PDFs"          # 本地 PDF 目录
+    recursive: true                   # 是否递归扫描子目录
+
+# 采集控制参数
+collection:
+  max_from_local: 100                # 本地最多扫描数
+
+# 去重与管理配置
+deduplication:
+  enabled: true
+  check_by:
+    - md5                            # 文件 MD5 哈希
+    - title                          # 标题相似度
+    - authors                        # 作者信息
+  
+  similarity_threshold: 0.85         # 相似度阈值（0-1）
+  hash_algorithm: "md5"
+
+# PDF 处理配置
+pdf_processing:
+  extract_metadata: true
+  extract_images: true
+  
+  image_settings:
+    min_width: 100                   # 最小宽度
+    min_height: 100                  # 最小高度
+    format: "png"                    # 输出格式
+    dpi: 150                         # DPI 分辨率
+  
+  ocr:
+    enabled: false                   # 是否启用 OCR
+    languages:
+      - "chi_sim"                    # 简体中文
+      - "eng"                        # 英文
+
+# 图注识别配置
+figure_recognition:
+  language: "mixed"                  # zh | en | mixed
+  
+  patterns:
+    cn:
+      - "图\\s*\\d+"                 # 图 1
+      - "图\\s*\\d+\\.\\d+"          # 图 1.1
+      - "插图\\s*\\d+"
+    
+    en:
+      - "Figure\\s+\\d+"             # Figure 1
+      - "Fig\\.\\s*\\d+"             # Fig. 1
+      - "Fig\\s+\\d+"
+  
+  split_subfigures: false            # 是否拆分 a, b, c 等子图
+
+# 输出配置
+output:
+  base_dir: "./output"
+  
+  structure:
+    figures_dir: "figures"           # 提取的图版目录
+    metadata_file: "metadata.xlsx"   # 元数据表格
+    logs_dir: "logs"                 # 日志目录
+    cache_file: "cache.db"           # 缓存数据库
+  
+  metadata_format: "excel"           # excel | csv
+  
+  fields:
+    - paper_id
+    - filename
+    - title
+    - authors
+    - year
+    - url
+    - md5_hash
+    - page_num
+    - figure_id
+    - figure_caption
+    - figure_path
+    - species
+    - status
+    - notes
+
+# 日志配置
+logging:
+  level: "INFO"                      # DEBUG | INFO | WARNING | ERROR
+  console_output: true
+  file_output: true
+  file_path: "./output/logs/local_collector.log"

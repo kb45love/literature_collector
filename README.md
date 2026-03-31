@@ -31,39 +31,58 @@ literature_collector/
 
 ## 🚀 快速开始
 
-### 1️⃣ 环境配置
+⚠️ **重要**：本项目已升级为**分离架构**！请查看 [SEPARATION_GUIDE.md](SEPARATION_GUIDE.md) 了解新的使用方法。
 
+### 新架构说明（推荐）
+
+项目现在分为两个**完全独立**的运行模式：
+
+| 模式 | 脚本 | 配置文件 | 用途 |
+|-----|------|--------|------|
+| **本地模式** | `run_local.py` | `config_local.yaml` | 处理已有的本地PDF |
+| **网络模式** | `run_web.py` | `config_web.yaml` | 从网络搜索和下载文献 |
+
+### ⚡ 最快上手（2分钟）
+
+#### 仅处理本地PDF（推荐首先尝试）
 ```bash
-# 安装依赖包
+# 1. 确保依赖已安装
 pip install -r requirements.txt
 
-# 验证环境（可选）
-python test_setup.py
+# 2. 准备PDF文件到 data/PDFs 目录
+
+# 3. 运行本地扫描
+python run_local.py
+
+# 4. 查看结果在 output/ 目录
 ```
 
-### 2️⃣ 配置系统
-
-编辑 `config.yaml` 文件：
-
-```yaml
-# 采集来源
-sources:
-  local:
-    root_dir: "./data/PDFs"    # 你的本地 PDF 目录
-
-# 采集参数
-collection:
-  max_from_web: 50       # 网络采集最多 50 篇
-  max_from_local: 100    # 本地扫描最多 100 篇
-  keywords:
-    - "植物考古学"
-    - "植物遗迹"
-```
-
-### 3️⃣ 运行采集
-
+#### 从网络采集文献
 ```bash
-# 双源采集（推荐）
+# 1. 编辑 config_web.yaml，修改搜索关键词
+
+# 2. 运行网络采集
+python run_web.py
+
+# 3. 查看结果在 output/ 目录
+```
+
+### 📖 详细使用指南
+
+请见 [SEPARATION_GUIDE.md](SEPARATION_GUIDE.md)，包含：
+- ✅ 详细的架构说明
+- ✅ 完整的配置参数说明
+- ✅ 各种使用场景下的命令
+- ✅ 常见问题解答
+- ✅ 故障排查指南
+
+### （已弃用）原 main.py 的使用
+
+原 `main.py` 仍然可用，但**不推荐**使用。
+
+若需使用原脚本：
+```bash
+# 双源采集（本地 + 网络）
 python main.py
 
 # 仅网络采集
@@ -76,9 +95,11 @@ python main.py --local-only
 python main.py --config config.yaml
 ```
 
+关于原 main.py 的详细说明，参考 [SEPARATION_GUIDE.md](SEPARATION_GUIDE.md) 中的"迁移指南"章节。
+
 ## 🎯 核心功能
 
-### ✅ 双源采集
+### ✅ 多源采集
 - **网络采集**：Google Scholar + 知网（CNKI）
 - **本地扫描**：递归扫描本地 PDF 目录
 

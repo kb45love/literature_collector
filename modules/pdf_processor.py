@@ -72,13 +72,14 @@ class PDFProcessor:
             logger.error(f"提取文本失败：{e}")
             return ""
     
-    def extract_images(self, output_dir: str = None, min_size: Tuple[int, int] = (100, 100)) -> List[Dict]:
+    def extract_images(self, output_dir: str = None, min_size: Tuple[int, int] = (100, 100), filename_prefix: str = None) -> List[Dict]:
         """
         提取 PDF 中的图片
         
         Args:
             output_dir: 图片输出目录
             min_size: 最小图片尺寸
+            filename_prefix: 图片文件名前缀（不包含扩展名），如果为None则使用默认格式
         
         Returns:
             图片信息列表
@@ -105,7 +106,10 @@ class PDFProcessor:
                             continue
                         
                         image_count += 1
-                        filename = f"page_{page_num}_img_{img_index}.png"
+                        if filename_prefix:
+                            filename = f"{filename_prefix}_page{page_num}_fig{image_count}.png"
+                        else:
+                            filename = f"page_{page_num}_img_{img_index}.png"
                         
                         if output_dir:
                             filepath = Path(output_dir) / filename
