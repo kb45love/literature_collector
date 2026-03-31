@@ -1,0 +1,11 @@
+requests
+beautifulsoup4
+selenium
+pymupdf
+pdfplumber
+pandas
+openpyxl
+pyyaml
+python-dotenv
+tqdm
+Pillow

@@ -1,0 +1,55 @@
+# 忽略文件清单
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 项目数据
+data/PDFs/*.pdf
+output/
+!output/.gitkeep
+
+# 缓存和临时文件
+*.cache
+*.tmp
+*.temp
+cache/
+
+# 日志
+logs/
+*.log
+
+# 操作系统
+Thumbs.db
+.DS_Store
